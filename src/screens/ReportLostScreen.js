@@ -8,10 +8,12 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { categories, gtBuildings } from '../data/mockItems';
+import ApiService from '../services/api';
 
 export default function ReportLostScreen({ navigation }) {
   const [itemName, setItemName] = useState('');
@@ -19,6 +21,7 @@ export default function ReportLostScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState(gtBuildings[0]);
   const [photo, setPhoto] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -33,33 +36,76 @@ export default function ReportLostScreen({ navigation }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!itemName.trim() || !description.trim()) {
       Alert.alert('Missing Information', 'Please fill in item name and description');
       return;
     }
 
-    // In a real app, this would save to Firestore
-    // For now, just show success and navigate
-    Alert.alert(
-      'Lost Item Reported',
-      `We've logged your lost ${itemName}. You'll receive an email notification if someone reports finding a matching item.`,
-      [
-        {
-          text: 'View Map',
-          onPress: () => navigation.navigate('Map'),
-        },
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+    setIsSubmitting(true);
 
-    // Clear form
-    setItemName('');
-    setDescription('');
-    setPhoto(null);
+    try {
+      // Upload photo if exists
+      let photoUrl = null;
+      if (photo) {
+        try {
+          photoUrl = await ApiService.uploadImage(photo);
+        } catch (error) {
+          console.warn('Failed to upload image, proceeding without photo:', error);
+          // Continue without photo if upload fails
+        }
+      }
+
+      // Get location coordinates
+      const coordinates = ApiService.getBuildingCoordinates(location);
+
+      // Prepare item data
+      const itemData = {
+        userId: 'u12345', // TODO: Replace with actual user ID from auth
+        title: itemName,
+        category: category,
+        description: description,
+        location: {
+          building: location,
+          lat: coordinates.lat,
+          lng: coordinates.lng,
+        },
+        photoUrl: photoUrl,
+      };
+
+      // Submit to backend
+      const response = await ApiService.reportLostItem(itemData);
+
+      setIsSubmitting(false);
+
+      // Show success message
+      Alert.alert(
+        'Lost Item Reported',
+        `We've logged your lost ${itemName}. You'll receive a notification if someone reports finding a matching item.\n\nItem ID: ${response.itemId}`,
+        [
+          {
+            text: 'View Map',
+            onPress: () => navigation.navigate('Map'),
+          },
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+
+      // Clear form
+      setItemName('');
+      setDescription('');
+      setPhoto(null);
+    } catch (error) {
+      setIsSubmitting(false);
+      Alert.alert(
+        'Submission Failed',
+        `Failed to report lost item: ${error.message}. Please try again.`,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   return (
@@ -87,6 +133,7 @@ export default function ReportLostScreen({ navigation }) {
               selectedValue={category}
               onValueChange={setCategory}
               style={styles.picker}
+              mode="dropdown"
             >
               {categories.map((cat) => (
                 <Picker.Item key={cat} label={cat} value={cat} />
@@ -111,6 +158,7 @@ export default function ReportLostScreen({ navigation }) {
               selectedValue={location}
               onValueChange={setLocation}
               style={styles.picker}
+              mode="dropdown"
             >
               {gtBuildings.map((building) => (
                 <Picker.Item key={building} label={building} value={building} />
@@ -131,8 +179,16 @@ export default function ReportLostScreen({ navigation }) {
           )}
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit Lost Item Report</Text>
+        <TouchableOpacity
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Submit Lost Item Report</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -201,7 +257,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   picker: {
-    height: 50,
+    height: 200
   },
   photoButton: {
     backgroundColor: '#fff',
@@ -233,6 +289,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',
