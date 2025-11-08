@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,18 +9,113 @@ import {
   SafeAreaView,
   Image,
   FlatList,
+  ActivityIndicator,
+  RefreshControl,
+  Platform,
 } from 'react-native';
-import { mockFoundItems, categories } from '../data/mockItems';
+import { useFocusEffect } from '@react-navigation/native';
+import { categories } from '../data/mockItems';
+import ApiService from '../services/api';
+
+// Helper to get correct API URL for platform
+const getApiUrl = () => {
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8000/api';
+  }
+  return 'http://localhost:8000/api';
+};
 
 // Simple mock map using an image and positioned markers
 export default function MapScreen({ navigation }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch ALL items (both lost and found) from backend
+  const fetchAllItems = async () => {
+    try {
+      setError(null);
+      const apiUrl = getApiUrl();
+
+      // Fetch both lost and found items in parallel
+      const [foundResponse, lostResponse] = await Promise.all([
+        fetch(`${apiUrl}/items/found/all`),
+        fetch(`${apiUrl}/items/lost/all`)
+      ]);
+
+      if (!foundResponse.ok || !lostResponse.ok) {
+        throw new Error('Failed to fetch items');
+      }
+
+      const foundData = await foundResponse.json();
+      const lostData = await lostResponse.json();
+
+      // Combine and map both types
+      const allItems = [
+        ...foundData.items.map(item => ({
+          id: item.itemId,
+          name: item.title,
+          category: item.category,
+          location: item.location.building,
+          description: item.description,
+          timestamp: new Date(item.createdAt).getTime(),
+          lat: item.location.lat,
+          lng: item.location.lng,
+          photoUrl: item.photoUrl,
+          itemType: 'found', // Track type for styling
+        })),
+        ...lostData.items.map(item => ({
+          id: item.itemId,
+          name: item.title,
+          category: item.category,
+          location: item.location.building,
+          description: item.description,
+          timestamp: new Date(item.createdAt).getTime(),
+          lat: item.location.lat,
+          lng: item.location.lng,
+          photoUrl: item.photoUrl,
+          itemType: 'lost', // Track type for styling
+        }))
+      ];
+
+      // Sort by timestamp (newest first)
+      allItems.sort((a, b) => b.timestamp - a.timestamp);
+      setItems(allItems);
+    } catch (err) {
+      console.error('Error fetching items:', err);
+      setError(err.message);
+      setItems([]); // Fallback to empty array on error
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Load items on mount
+  useEffect(() => {
+    fetchAllItems();
+  }, []);
+
+  // Refresh when screen comes into focus (after reporting item)
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAllItems();
+    }, [])
+  );
+
+  // Pull to refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAllItems();
+  };
 
   const filteredItems =
     activeFilter === 'All'
-      ? mockFoundItems
-      : mockFoundItems.filter((item) => item.category === activeFilter);
+      ? items
+      : items.filter((item) => item.category === activeFilter);
 
   const getCategoryColor = (category) => {
     const colors = {
@@ -62,14 +157,35 @@ export default function MapScreen({ navigation }) {
     return positions[item.location] || { top: '50%', left: '50%' };
   };
 
+  // Show loading indicator
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#B3A369" />
+          <Text style={styles.loadingText}>Loading items...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Count items by type
+  const lostCount = items.filter(item => item.itemType === 'lost').length;
+  const foundCount = items.filter(item => item.itemType === 'found').length;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Found Items Map</Text>
+        <Text style={styles.headerTitle}>Lost & Found Map</Text>
         <Text style={styles.headerSubtitle}>
-          {filteredItems.length} items found on campus
+          {lostCount} lost • {foundCount} found • {filteredItems.length} showing
         </Text>
+        {error && (
+          <Text style={styles.errorText}>
+            ⚠️ {error} - Showing cached data
+          </Text>
+        )}
       </View>
 
       {/* Category Filters */}
@@ -92,12 +208,12 @@ export default function MapScreen({ navigation }) {
               activeFilter === 'All' && styles.filterTextActive,
             ]}
           >
-            All ({mockFoundItems.length})
+            All ({items.length})
           </Text>
         </TouchableOpacity>
 
         {categories.map((category) => {
-          const count = mockFoundItems.filter((item) => item.category === category)
+          const count = items.filter((item) => item.category === category)
             .length;
           if (count === 0) return null;
 
@@ -179,7 +295,17 @@ export default function MapScreen({ navigation }) {
                 ]}
               />
               <View style={styles.listItemContent}>
-                <Text style={styles.listItemName}>{item.name}</Text>
+                <View style={styles.listItemHeader}>
+                  <Text style={styles.listItemName}>{item.name}</Text>
+                  <View style={[
+                    styles.typeBadge,
+                    item.itemType === 'lost' ? styles.lostBadge : styles.foundBadge
+                  ]}>
+                    <Text style={styles.typeBadgeText}>
+                      {item.itemType === 'lost' ? '❓ Lost' : '✓ Found'}
+                    </Text>
+                  </View>
+                </View>
                 <Text style={styles.listItemLocation}>
                   📍 {item.location} • {formatTimeAgo(item.timestamp)}
                 </Text>
@@ -187,6 +313,14 @@ export default function MapScreen({ navigation }) {
             </TouchableOpacity>
           )}
           style={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#B3A369"
+              colors={['#B3A369']}
+            />
+          }
         />
       </View>
 
@@ -299,6 +433,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
   header: {
     backgroundColor: '#003057',
     padding: 16,
@@ -312,6 +457,11 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#B3A369',
+    marginTop: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ff6b6b',
     marginTop: 4,
   },
   filterContainer: {
@@ -423,11 +573,33 @@ const styles = StyleSheet.create({
   listItemContent: {
     flex: 1,
   },
+  listItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   listItemName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#003057',
-    marginBottom: 4,
+    flex: 1,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  lostBadge: {
+    backgroundColor: '#ffebee',
+  },
+  foundBadge: {
+    backgroundColor: '#e8f5e9',
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   listItemLocation: {
     fontSize: 13,

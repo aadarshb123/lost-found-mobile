@@ -8,10 +8,12 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { categories, gtBuildings } from '../data/mockItems';
+import ApiService from '../services/api';
 
 export default function ReportFoundScreen({ navigation }) {
   const [itemName, setItemName] = useState('');
@@ -19,6 +21,7 @@ export default function ReportFoundScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState(gtBuildings[0]);
   const [photo, setPhoto] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -33,41 +36,85 @@ export default function ReportFoundScreen({ navigation }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!itemName.trim() || !description.trim()) {
       Alert.alert('Missing Information', 'Please fill in item name and description');
       return;
     }
 
-    // In a real app, this would:
-    // 1. Save to Firestore
-    // 2. Trigger Cloud Function to check for matches
-    // 3. Send notifications to matched users
+    setIsSubmitting(true);
 
-    // For prototype, show success message
-    Alert.alert(
-      'Found Item Reported',
-      `Thank you! We've logged this ${itemName}. If it matches a lost item report, we'll notify the owner automatically.`,
-      [
-        {
-          text: 'View on Map',
-          onPress: () => navigation.navigate('Map'),
+    try {
+      // Upload photo if exists
+      let photoUrl = null;
+      if (photo) {
+        try {
+          photoUrl = await ApiService.uploadImage(photo);
+        } catch (error) {
+          console.warn('Failed to upload image, proceeding without photo:', error);
+          // Continue without photo if upload fails
+        }
+      }
+
+      // Get location coordinates
+      const coordinates = ApiService.getBuildingCoordinates(location);
+
+      // Prepare item data
+      const itemData = {
+        userId: 'u12345', // TODO: Replace with actual user ID from auth
+        title: itemName,
+        category: category,
+        description: description,
+        location: {
+          building: location,
+          lat: coordinates.lat,
+          lng: coordinates.lng,
         },
-        {
-          text: 'Report Another',
-          onPress: () => {
-            // Clear form
-            setItemName('');
-            setDescription('');
-            setPhoto(null);
+        photoUrl: photoUrl,
+      };
+
+      // Submit to backend
+      const response = await ApiService.reportFoundItem(itemData);
+
+      setIsSubmitting(false);
+
+      // Check if there are matches
+      const hasMatches = response.matches && response.matches.length > 0;
+
+      // Show success message
+      Alert.alert(
+        'Found Item Reported',
+        hasMatches
+          ? `Thank you! We found ${response.matches.length} potential match(es) for this ${itemName}. We've notified the owner(s) automatically.\n\nItem ID: ${response.itemId}`
+          : `Thank you! We've logged this ${itemName}. If it matches a lost item report in the future, we'll notify the owner automatically.\n\nItem ID: ${response.itemId}`,
+        [
+          {
+            text: 'View on Map',
+            onPress: () => navigation.navigate('Map'),
           },
-        },
-        {
-          text: 'Done',
-          onPress: () => navigation.navigate('Home'),
-        },
-      ]
-    );
+          {
+            text: 'Report Another',
+            onPress: () => {
+              // Clear form
+              setItemName('');
+              setDescription('');
+              setPhoto(null);
+            },
+          },
+          {
+            text: 'Done',
+            onPress: () => navigation.navigate('Home'),
+          },
+        ]
+      );
+    } catch (error) {
+      setIsSubmitting(false);
+      Alert.alert(
+        'Submission Failed',
+        `Failed to report found item: ${error.message}. Please try again.`,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   return (
@@ -142,8 +189,16 @@ export default function ReportFoundScreen({ navigation }) {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit Found Item Report</Text>
+        <TouchableOpacity
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Submit Found Item Report</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -212,7 +267,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   picker: {
-    height: 50,
+    height: 200,
   },
   photoButton: {
     backgroundColor: '#fff',
@@ -250,6 +305,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',
