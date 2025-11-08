@@ -1,6 +1,21 @@
 // API service for communicating with the backend
+import { Platform } from 'react-native';
+
+const getDevApiUrl = () => {
+  // iOS Simulator can use localhost
+  if (Platform.OS === 'ios') {
+    return 'http://localhost:8000/api';
+  }
+  // Android Emulator needs 10.0.2.2 instead of localhost
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8000/api';
+  }
+  // Fallback
+  return 'http://localhost:8000/api';
+};
+
 const API_BASE_URL = __DEV__
-  ? 'http://localhost:8000/api'  // Use localhost for development
+  ? getDevApiUrl()
   : 'https://example-prod-api.com/api';
 
 class ApiService {
