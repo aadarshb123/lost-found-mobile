@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  Image,
 } from 'react-native';
 
 export default function HomeScreen({ navigation }) {
@@ -23,33 +22,33 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.loginSection}>
           <TouchableOpacity
             style={styles.loginButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.loginButtonText}>Sign In / Create Account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.guestButton}
             onPress={() => navigation.navigate('Map')}
           >
-            <Text style={styles.loginButtonText}>Continue as GT Student</Text>
+            <Text style={styles.guestButtonText}>Continue as Guest</Text>
           </TouchableOpacity>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.actionsTitle}>Quick Actions</Text>
+          <Text style={styles.actionsTitle}>How It Works</Text>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('ReportLost')}
-          >
+          <View style={styles.actionButton}>
             <Text style={styles.actionIcon}>📢</Text>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionTitle}>Report Lost Item</Text>
               <Text style={styles.actionSubtitle}>
-                Lost something? Let us help you find it
+                Lost something? Create a report and get notified when it's found
               </Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('ReportFound')}
-          >
+          <View style={styles.actionButton}>
             <Text style={styles.actionIcon}>🎯</Text>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionTitle}>Report Found Item</Text>
@@ -57,20 +56,27 @@ export default function HomeScreen({ navigation }) {
                 Found something? Help return it to its owner
               </Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Map')}
-          >
+          <View style={styles.actionButton}>
             <Text style={styles.actionIcon}>🗺️</Text>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionTitle}>Browse Map</Text>
               <Text style={styles.actionSubtitle}>
-                See all found items on campus
+                See all found items on campus in real-time
               </Text>
             </View>
-          </TouchableOpacity>
+          </View>
+
+          <View style={styles.actionButton}>
+            <Text style={styles.actionIcon}>📧</Text>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>Get Notified</Text>
+              <Text style={styles.actionSubtitle}>
+                Receive email alerts when matching items are found
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -118,17 +124,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginBottom: 12,
   },
   loginButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
   },
-  loginNote: {
-    textAlign: 'center',
-    color: '#999',
-    fontSize: 12,
-    marginTop: 8,
+  guestButton: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#B3A369',
+  },
+  guestButtonText: {
+    color: '#B3A369',
+    fontSize: 16,
+    fontWeight: '600',
   },
   actionsSection: {
     flex: 1,

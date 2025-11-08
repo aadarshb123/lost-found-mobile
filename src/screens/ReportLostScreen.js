@@ -8,10 +8,12 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { categories, gtBuildings } from '../data/mockItems';
+import { sendLostItemConfirmation } from '../services/emailService';
 
 export default function ReportLostScreen({ navigation }) {
   const [itemName, setItemName] = useState('');
@@ -19,6 +21,9 @@ export default function ReportLostScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState(gtBuildings[0]);
   const [photo, setPhoto] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -33,33 +38,86 @@ export default function ReportLostScreen({ navigation }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // Validation
     if (!itemName.trim() || !description.trim()) {
       Alert.alert('Missing Information', 'Please fill in item name and description');
       return;
     }
 
-    // In a real app, this would save to Firestore
-    // For now, just show success and navigate
-    Alert.alert(
-      'Lost Item Reported',
-      `We've logged your lost ${itemName}. You'll receive an email notification if someone reports finding a matching item.`,
-      [
-        {
-          text: 'View Map',
-          onPress: () => navigation.navigate('Map'),
-        },
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+    if (!userEmail.trim() || !userName.trim()) {
+      Alert.alert('Missing Information', 'Please provide your name and email for notifications');
+      return;
+    }
 
-    // Clear form
+    if (!userEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Send email notification
+      const emailResult = await sendLostItemConfirmation({
+        userEmail: userEmail,
+        userName: userName,
+        itemName: itemName,
+        itemDescription: description,
+        category: category,
+        location: location,
+      });
+
+      setLoading(false);
+
+      if (emailResult.success) {
+        Alert.alert(
+          'Lost Item Reported! 📧',
+          `We've logged your lost ${itemName} and sent a confirmation email to ${userEmail}.\n\nYou'll receive an email notification if someone reports finding a matching item.`,
+          [
+            {
+              text: 'View Map',
+              onPress: () => {
+                resetForm();
+                navigation.navigate('Map');
+              },
+            },
+            {
+              text: 'OK',
+              onPress: () => {
+                resetForm();
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Item Reported',
+          `Your lost ${itemName} has been logged.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                resetForm();
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    }
+  };
+
+  const resetForm = () => {
     setItemName('');
     setDescription('');
     setPhoto(null);
+    setUserEmail('');
+    setUserName('');
   };
 
   return (
@@ -68,11 +126,41 @@ export default function ReportLostScreen({ navigation }) {
         <View style={styles.header}>
           <Text style={styles.title}>Report Lost Item</Text>
           <Text style={styles.subtitle}>
-            We'll notify you if someone finds something matching your description
+            We'll notify you via email if someone finds something matching your description
           </Text>
         </View>
 
         <View style={styles.form}>
+          {/* User Information */}
+          <Text style={styles.sectionTitle}>📧 Your Contact Information</Text>
+          
+          <Text style={styles.label}>Your Name *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="John Smith"
+            value={userName}
+            onChangeText={setUserName}
+            autoCapitalize="words"
+          />
+
+          <Text style={styles.label}>Your Email *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="your.email@example.com"
+            value={userEmail}
+            onChangeText={setUserEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoCorrect={false}
+          />
+
+          <Text style={styles.infoNote}>
+            💡 We'll send you email alerts when matching items are found
+          </Text>
+
+          {/* Item Information */}
+          <Text style={styles.sectionTitle}>🔍 Item Details</Text>
+
           <Text style={styles.label}>Item Name *</Text>
           <TextInput
             style={styles.input}
@@ -125,19 +213,26 @@ export default function ReportLostScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
           {photo && (
-            <Text style={styles.photoNote}>
-              Photo attached (not shown in prototype)
-            </Text>
+            <Text style={styles.photoNote}>Photo attached (not shown in prototype)</Text>
           )}
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit Lost Item Report</Text>
+        <TouchableOpacity 
+          style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Submit Lost Item Report</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => navigation.goBack()}
+          disabled={loading}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
@@ -170,9 +265,17 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#666',
+    lineHeight: 20,
   },
   form: {
     marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#003057',
+    marginTop: 24,
+    marginBottom: 12,
   },
   label: {
     fontSize: 16,
@@ -222,6 +325,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
+  infoNote: {
+    fontSize: 13,
+    color: '#666',
+    backgroundColor: '#e7f3ff',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    lineHeight: 18,
+  },
   submitButton: {
     backgroundColor: '#B3A369',
     padding: 16,
@@ -233,6 +345,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',

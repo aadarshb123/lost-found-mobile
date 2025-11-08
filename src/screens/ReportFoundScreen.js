@@ -8,10 +8,22 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Notifications from 'expo-notifications';
 import { categories, gtBuildings } from '../data/mockItems';
+import { sendFoundItemConfirmation, sendMatchNotification } from '../services/emailService';
+
+// Configure notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function ReportFoundScreen({ navigation }) {
   const [itemName, setItemName] = useState('');
@@ -19,6 +31,9 @@ export default function ReportFoundScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState(gtBuildings[0]);
   const [photo, setPhoto] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -33,41 +48,157 @@ export default function ReportFoundScreen({ navigation }) {
     }
   };
 
-  const handleSubmit = () => {
+  // Request notification permissions
+  const requestNotificationPermissions = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === 'granted';
+  };
+
+  // Send in-app notification
+  const sendInAppNotification = async () => {
+    const hasPermission = await requestNotificationPermissions();
+    
+    if (hasPermission) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🎯 Match Found!',
+          body: `Someone reported finding: ${itemName || 'an item'}`,
+          data: { itemName, category, location },
+        },
+        trigger: null, // Show immediately
+      });
+    }
+  };
+
+  // DEMO: Send test notification (email + in-app)
+  const handleSendDemoNotification = async () => {
+    if (!itemName.trim()) {
+      Alert.alert('Enter Item Details', 'Please fill in at least the item name to send a demo notification');
+      return;
+    }
+
+    if (!userEmail.trim()) {
+      Alert.alert('Enter Email', 'Please enter your email to receive the demo notification');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Send in-app notification
+      await sendInAppNotification();
+
+      // Send email notification
+      const emailResult = await sendMatchNotification({
+        userEmail: userEmail,
+        userName: userName || 'User',
+        itemName: itemName,
+        itemDescription: description || 'No description provided',
+        category: category,
+        location: location,
+      });
+
+      setLoading(false);
+
+      if (emailResult.success) {
+        Alert.alert(
+          '🎉 Demo Notification Sent!',
+          `Notification sent to:\n📧 Email: ${userEmail}\n📱 In-app: Check your notifications\n\nThis demonstrates how users will be notified when a matching item is found!`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          '📱 In-App Notification Sent!',
+          'Email notification failed, but in-app notification was sent. Check your notification tray!',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', 'Failed to send demo notification');
+    }
+  };
+
+  const handleSubmit = async () => {
+    // Validation
     if (!itemName.trim() || !description.trim()) {
       Alert.alert('Missing Information', 'Please fill in item name and description');
       return;
     }
 
-    // In a real app, this would:
-    // 1. Save to Firestore
-    // 2. Trigger Cloud Function to check for matches
-    // 3. Send notifications to matched users
+    if (!userEmail.trim() || !userName.trim()) {
+      Alert.alert('Missing Information', 'Please provide your name and email');
+      return;
+    }
 
-    // For prototype, show success message
-    Alert.alert(
-      'Found Item Reported',
-      `Thank you! We've logged this ${itemName}. If it matches a lost item report, we'll notify the owner automatically.`,
-      [
-        {
-          text: 'View on Map',
-          onPress: () => navigation.navigate('Map'),
-        },
-        {
-          text: 'Report Another',
-          onPress: () => {
-            // Clear form
-            setItemName('');
-            setDescription('');
-            setPhoto(null);
-          },
-        },
-        {
-          text: 'Done',
-          onPress: () => navigation.navigate('Home'),
-        },
-      ]
-    );
+    if (!userEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Send confirmation email
+      const emailResult = await sendFoundItemConfirmation({
+        userEmail: userEmail,
+        userName: userName,
+        itemName: itemName,
+        itemDescription: description,
+        category: category,
+        location: location,
+      });
+
+      setLoading(false);
+
+      if (emailResult.success) {
+        Alert.alert(
+          'Found Item Reported! 📧',
+          `Thank you for reporting the ${itemName}!\n\nWe've sent a confirmation to ${userEmail}. The item is now visible on the map. If the owner claims it, we'll notify you.`,
+          [
+            {
+              text: 'View on Map',
+              onPress: () => {
+                resetForm();
+                navigation.navigate('Map');
+              },
+            },
+            {
+              text: 'OK',
+              onPress: () => {
+                resetForm();
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Item Reported',
+          `The ${itemName} has been added to the map.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                resetForm();
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    }
+  };
+
+  const resetForm = () => {
+    setItemName('');
+    setDescription('');
+    setPhoto(null);
+    setUserEmail('');
+    setUserName('');
   };
 
   return (
@@ -76,11 +207,41 @@ export default function ReportFoundScreen({ navigation }) {
         <View style={styles.header}>
           <Text style={styles.title}>Report Found Item</Text>
           <Text style={styles.subtitle}>
-            Help return a lost item to its owner
+            Help return lost items to their owners. We'll notify you if someone claims it.
           </Text>
         </View>
 
         <View style={styles.form}>
+          {/* User Information */}
+          <Text style={styles.sectionTitle}>📧 Your Contact Information</Text>
+          
+          <Text style={styles.label}>Your Name *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="John Smith"
+            value={userName}
+            onChangeText={setUserName}
+            autoCapitalize="words"
+          />
+
+          <Text style={styles.label}>Your Email *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="your.email@example.com"
+            value={userEmail}
+            onChangeText={setUserEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoCorrect={false}
+          />
+
+          <Text style={styles.infoNote}>
+            💡 We'll notify you if the owner claims this item
+          </Text>
+
+          {/* Item Information */}
+          <Text style={styles.sectionTitle}>🎯 Item Details</Text>
+
           <Text style={styles.label}>Item Name *</Text>
           <TextInput
             style={styles.input}
@@ -105,7 +266,7 @@ export default function ReportFoundScreen({ navigation }) {
           <Text style={styles.label}>Description *</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder="Describe the item in detail (color, brand, distinguishing marks...)"
+            placeholder="Describe the item in detail to help the owner identify it..."
             value={description}
             onChangeText={setDescription}
             multiline
@@ -113,7 +274,7 @@ export default function ReportFoundScreen({ navigation }) {
             textAlignVertical="top"
           />
 
-          <Text style={styles.label}>Found At *</Text>
+          <Text style={styles.label}>Found Location *</Text>
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={location}
@@ -133,22 +294,45 @@ export default function ReportFoundScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
           {photo && (
-            <Text style={styles.photoNote}>
-              Photo attached (not shown in prototype)
-            </Text>
+            <Text style={styles.photoNote}>Photo attached (not shown in prototype)</Text>
           )}
-          <Text style={styles.helpText}>
-            💡 Adding a photo helps owners identify their item
-          </Text>
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit Found Item Report</Text>
+        {/* DEMO: Test Notification Button */}
+        <View style={styles.demoSection}>
+          <Text style={styles.demoTitle}>🧪 Demo Notification System</Text>
+          <Text style={styles.demoText}>
+            Test how users will be notified when items match! This sends both an email and in-app notification.
+          </Text>
+          <TouchableOpacity 
+            style={[styles.demoButton, loading && styles.demoButtonDisabled]} 
+            onPress={handleSendDemoNotification}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.demoButtonText}>📬 Send Demo Notification</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Submit Found Item Report</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => navigation.goBack()}
+          disabled={loading}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
@@ -181,9 +365,17 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#666',
+    lineHeight: 20,
   },
   form: {
     marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#003057',
+    marginTop: 24,
+    marginBottom: 12,
   },
   label: {
     fontSize: 16,
@@ -233,11 +425,48 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
-  helpText: {
+  infoNote: {
     fontSize: 13,
     color: '#666',
+    backgroundColor: '#e7f3ff',
+    padding: 12,
+    borderRadius: 8,
     marginTop: 8,
-    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  demoSection: {
+    backgroundColor: '#fff3cd',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#ffc107',
+  },
+  demoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 8,
+  },
+  demoText: {
+    fontSize: 14,
+    color: '#856404',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  demoButton: {
+    backgroundColor: '#ffc107',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  demoButtonDisabled: {
+    opacity: 0.6,
+  },
+  demoButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '600',
   },
   submitButton: {
     backgroundColor: '#B3A369',
@@ -250,6 +479,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',
