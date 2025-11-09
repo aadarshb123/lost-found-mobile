@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useFocusEffect } from '@react-navigation/native';
 import { categories } from '../data/mockItems';
 import ApiService from '../services/api';
@@ -25,14 +26,89 @@ const getApiUrl = () => {
   return 'http://localhost:8000/api';
 };
 
-// Simple mock map using an image and positioned markers
+// Georgia Tech campus center coordinates
+const GT_CENTER = {
+  latitude: 33.7756,
+  longitude: -84.3963,
+  latitudeDelta: 0.02,
+  longitudeDelta: 0.02,
+};
+
+// Helper function to get category colors
+const getCategoryColor = (category) => {
+  const colors = {
+    BuzzCard: '#B3A369',
+    Electronics: '#4A90E2',
+    'Water Bottle': '#7ED321',
+    Clothing: '#BD10E0',
+    Bag: '#F5A623',
+    Keys: '#D0021B',
+    Books: '#8B572A',
+    Other: '#9013FE',
+  };
+  return colors[category] || '#003057';
+};
+
+// Generate Leaflet map HTML
+const generateMapHTML = (items) => {
+  const markers = items.map((item) => {
+    const color = getCategoryColor(item.category);
+    const emoji = item.itemType === 'lost' ? '❓' : '✓';
+    return `
+      L.marker([${item.lat}, ${item.lng}], {
+        icon: L.divIcon({
+          className: 'custom-marker',
+          html: '<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><span style="font-size: 16px;">${emoji}</span></div>',
+          iconSize: [30, 30]
+        })
+      })
+      .addTo(map)
+      .bindPopup('<b>${item.name.replace(/'/g, "\\'")}</b><br>${item.location}<br><small>${item.category}</small>')
+      .on('click', function() {
+        window.ReactNativeWebView.postMessage('${item.id}');
+      });
+    `;
+  }).join('\n');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        body { margin: 0; padding: 0; }
+        #map { width: 100%; height: 100vh; }
+        .custom-marker { background: transparent; border: none; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map('map').setView([${GT_CENTER.latitude}, ${GT_CENTER.longitude}], 15);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(map);
+
+        ${markers}
+      </script>
+    </body>
+    </html>
+  `;
+};
+
 export default function MapScreen({ navigation }) {
+  const mapRef = useRef(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeFilter, setActiveFilter] = useState('All');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
 
   // Fetch ALL items (both lost and found) from backend
   const fetchAllItems = async () => {
@@ -117,20 +193,6 @@ export default function MapScreen({ navigation }) {
       ? items
       : items.filter((item) => item.category === activeFilter);
 
-  const getCategoryColor = (category) => {
-    const colors = {
-      BuzzCard: '#B3A369',
-      Electronics: '#4A90E2',
-      'Water Bottle': '#7ED321',
-      Clothing: '#BD10E0',
-      Bag: '#F5A623',
-      Keys: '#D0021B',
-      Books: '#8B572A',
-      Other: '#9013FE',
-    };
-    return colors[category] || '#003057';
-  };
-
   const formatTimeAgo = (timestamp) => {
     const hours = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60));
     if (hours < 1) return 'Less than 1 hour ago';
@@ -138,23 +200,6 @@ export default function MapScreen({ navigation }) {
     if (hours < 24) return `${hours} hours ago`;
     const days = Math.floor(hours / 24);
     return days === 1 ? '1 day ago' : `${days} days ago`;
-  };
-
-  // Map markers as overlays (simplified positioning)
-  // In real app, these would be calculated from lat/lng
-  const getMarkerPosition = (item) => {
-    const positions = {
-      'Student Center': { top: '50%', left: '45%' },
-      'Klaus Building': { top: '35%', left: '55%' },
-      'Library West': { top: '45%', left: '50%' },
-      'Library East': { top: '45%', left: '52%' },
-      'CRC': { top: '60%', left: '30%' },
-      'Van Leer': { top: '40%', left: '52%' },
-      'Clough Commons': { top: '42%', left: '55%' },
-      'Howey Building': { top: '38%', left: '48%' },
-      'Tech Square Parking': { top: '25%', left: '60%' },
-    };
-    return positions[item.location] || { top: '50%', left: '50%' };
   };
 
   // Show loading indicator
@@ -247,34 +292,32 @@ export default function MapScreen({ navigation }) {
         })}
       </ScrollView>
 
-      {/* Mock Map with Markers */}
+      {/* Map View - Simple Leaflet Map */}
       <View style={styles.mapContainer}>
-        {/* Background - mock campus map */}
-        <View style={styles.mockMap}>
-          <Text style={styles.mapPlaceholder}>🏛️ Georgia Tech Campus</Text>
-          <Text style={styles.mapNote}>(Interactive map - tap markers below)</Text>
+        <WebView
+          style={styles.map}
+          originWhitelist={['*']}
+          source={{ html: generateMapHTML(filteredItems) }}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          onMessage={(event) => {
+            const itemId = event.nativeEvent.data;
+            const item = filteredItems.find(i => i.id === itemId);
+            if (item) {
+              setSelectedItem(item);
+            }
+          }}
+        />
+        <View style={styles.mapLegend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#ff6b6b' }]} />
+            <Text style={styles.legendText}>❓ Lost Items</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#4caf50' }]} />
+            <Text style={styles.legendText}>✓ Found Items</Text>
+          </View>
         </View>
-
-        {/* Item markers overlaid */}
-        {filteredItems.map((item) => {
-          const position = getMarkerPosition(item);
-          return (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.marker,
-                {
-                  top: position.top,
-                  left: position.left,
-                  backgroundColor: getCategoryColor(item.category),
-                },
-              ]}
-              onPress={() => setSelectedItem(item)}
-            >
-              <Text style={styles.markerText}>📍</Text>
-            </TouchableOpacity>
-          );
-        })}
       </View>
 
       {/* Items List (alternative to map for easy testing) */}
@@ -502,37 +545,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mapContainer: {
-    height: 250,
+    height: 300,
     backgroundColor: '#e8f4f8',
     position: 'relative',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
   },
-  mockMap: {
+  map: {
     flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  customMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e0f0e8',
-  },
-  mapPlaceholder: {
-    fontSize: 24,
-    color: '#003057',
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  mapNote: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  marker: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -540,8 +570,131 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-  markerText: {
+  markerEmoji: {
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  mapLegend: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: 8,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 2,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#003057',
+    fontWeight: '600',
+  },
+  // Fallback map styles (for Expo Go)
+  fallbackMap: {
+    flex: 1,
+    backgroundColor: '#e8f4f8',
+    paddingVertical: 16,
+  },
+  fallbackMapHeader: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  fallbackMapTitle: {
     fontSize: 20,
+    fontWeight: 'bold',
+    color: '#003057',
+    marginBottom: 4,
+  },
+  fallbackMapSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 6,
+  },
+  fallbackNote: {
+    fontSize: 12,
+    color: '#B3A369',
+    fontStyle: 'italic',
+  },
+  itemsPreview: {
+    paddingLeft: 16,
+  },
+  itemsPreviewContent: {
+    paddingRight: 16,
+  },
+  previewCard: {
+    width: 120,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginRight: 12,
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  previewMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    alignSelf: 'center',
+  },
+  previewEmoji: {
+    fontSize: 16,
+    color: '#fff',
+  },
+  previewName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#003057',
+    marginBottom: 4,
+  },
+  previewLocation: {
+    fontSize: 11,
+    color: '#666',
+  },
+  moreItemsCard: {
+    width: 80,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moreItemsText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#B3A369',
+  },
+  moreItemsLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
+  },
+  fallbackLegend: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   listSection: {
     flex: 1,
