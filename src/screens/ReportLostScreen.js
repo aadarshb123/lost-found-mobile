@@ -14,6 +14,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { categories, gtBuildings } from '../data/mockItems';
 import ApiService from '../services/api';
+import { sendLostItemConfirmation } from '../services/emailService';
 
 export default function ReportLostScreen({ navigation }) {
   const [itemName, setItemName] = useState('');
@@ -21,6 +22,8 @@ export default function ReportLostScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState(gtBuildings[0]);
   const [photo, setPhoto] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pickImage = async () => {
@@ -37,8 +40,19 @@ export default function ReportLostScreen({ navigation }) {
   };
 
   const handleSubmit = async () => {
+    // Validation
     if (!itemName.trim() || !description.trim()) {
       Alert.alert('Missing Information', 'Please fill in item name and description');
+      return;
+    }
+
+    if (!userEmail.trim() || !userName.trim()) {
+      Alert.alert('Missing Information', 'Please provide your name and email for notifications');
+      return;
+    }
+
+    if (!userEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
 
@@ -71,10 +85,22 @@ export default function ReportLostScreen({ navigation }) {
           lng: coordinates.lng,
         },
         photoUrl: photoUrl,
+        reporterEmail: userEmail,
+        reporterName: userName,
       };
 
       // Submit to backend
       const response = await ApiService.reportLostItem(itemData);
+
+      // Send confirmation email in parallel
+      sendLostItemConfirmation({
+        userEmail: userEmail,
+        userName: userName,
+        itemName: itemName,
+        itemDescription: description,
+        category: category,
+        location: location,
+      }).catch(err => console.warn('Email confirmation failed:', err));
 
       setIsSubmitting(false);
 
@@ -85,19 +111,20 @@ export default function ReportLostScreen({ navigation }) {
         [
           {
             text: 'View Map',
-            onPress: () => navigation.navigate('Map'),
+            onPress: () => {
+              resetForm();
+              navigation.navigate('Map');
+            },
           },
           {
             text: 'OK',
-            onPress: () => navigation.goBack(),
+            onPress: () => {
+              resetForm();
+              navigation.goBack();
+            },
           },
         ]
       );
-
-      // Clear form
-      setItemName('');
-      setDescription('');
-      setPhoto(null);
     } catch (error) {
       setIsSubmitting(false);
       Alert.alert(
@@ -108,17 +135,55 @@ export default function ReportLostScreen({ navigation }) {
     }
   };
 
+  const resetForm = () => {
+    setItemName('');
+    setDescription('');
+    setPhoto(null);
+    setUserEmail('');
+    setUserName('');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>Report Lost Item</Text>
           <Text style={styles.subtitle}>
-            We'll notify you if someone finds something matching your description
+            We'll notify you via email if someone finds something matching your description
           </Text>
         </View>
 
         <View style={styles.form}>
+          {/* User Information */}
+          <Text style={styles.sectionTitle}>📧 Your Contact Information</Text>
+          
+          <Text style={styles.label}>Your Name *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="John Smith"
+            value={userName}
+            onChangeText={setUserName}
+            autoCapitalize="words"
+          />
+
+          <Text style={styles.label}>Your Email *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="your.email@example.com"
+            value={userEmail}
+            onChangeText={setUserEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoCorrect={false}
+          />
+
+          <Text style={styles.infoNote}>
+            💡 We'll send you email alerts when matching items are found
+          </Text>
+
+          {/* Item Information */}
+          <Text style={styles.sectionTitle}>🔍 Item Details</Text>
+
           <Text style={styles.label}>Item Name *</Text>
           <TextInput
             style={styles.input}
@@ -173,9 +238,7 @@ export default function ReportLostScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
           {photo && (
-            <Text style={styles.photoNote}>
-              Photo attached (not shown in prototype)
-            </Text>
+            <Text style={styles.photoNote}>Photo attached (not shown in prototype)</Text>
           )}
         </View>
 
@@ -194,6 +257,7 @@ export default function ReportLostScreen({ navigation }) {
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => navigation.goBack()}
+          disabled={isSubmitting}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
@@ -226,9 +290,17 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#666',
+    lineHeight: 20,
   },
   form: {
     marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#003057',
+    marginTop: 24,
+    marginBottom: 12,
   },
   label: {
     fontSize: 16,
@@ -277,6 +349,15 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  infoNote: {
+    fontSize: 13,
+    color: '#666',
+    backgroundColor: '#e7f3ff',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    lineHeight: 18,
   },
   submitButton: {
     backgroundColor: '#B3A369',
