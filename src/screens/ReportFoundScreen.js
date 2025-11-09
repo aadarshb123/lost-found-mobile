@@ -176,7 +176,7 @@ export default function ReportFoundScreen({ navigation }) {
           <Text style={styles.label}>Photo (Recommended)</Text>
           <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
             <Text style={styles.photoButtonText}>
-              {photo ? '✓ Photo Added' : '📷 Add Photo'}
+              {photo ? 'Photo Added' : 'Add Photo'}
             </Text>
           </TouchableOpacity>
           {photo && (
@@ -185,7 +185,7 @@ export default function ReportFoundScreen({ navigation }) {
             </Text>
           )}
           <Text style={styles.helpText}>
-            💡 Adding a photo helps owners identify their item
+            Tip: Adding a photo helps owners identify their item
           </Text>
         </View>
 

@@ -53,12 +53,12 @@ const getCategoryColor = (category) => {
 const generateMapHTML = (items) => {
   const markers = items.map((item) => {
     const color = getCategoryColor(item.category);
-    const emoji = item.itemType === 'lost' ? '❓' : '✓';
+    const label = item.itemType === 'lost' ? 'L' : 'F';
     return `
       L.marker([${item.lat}, ${item.lng}], {
         icon: L.divIcon({
           className: 'custom-marker',
-          html: '<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><span style="font-size: 16px;">${emoji}</span></div>',
+          html: '<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><span style="font-size: 12px; color: white; font-weight: bold;">${label}</span></div>',
           iconSize: [30, 30]
         })
       })
@@ -228,7 +228,7 @@ export default function MapScreen({ navigation }) {
         </Text>
         {error && (
           <Text style={styles.errorText}>
-            ⚠️ {error} - Showing cached data
+            Warning: {error} - Showing cached data
           </Text>
         )}
       </View>
@@ -311,18 +311,34 @@ export default function MapScreen({ navigation }) {
         <View style={styles.mapLegend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#ff6b6b' }]} />
-            <Text style={styles.legendText}>❓ Lost Items</Text>
+            <Text style={styles.legendText}>Lost Items</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#4caf50' }]} />
-            <Text style={styles.legendText}>✓ Found Items</Text>
+            <Text style={styles.legendText}>Found Items</Text>
           </View>
         </View>
       </View>
 
-      {/* Items List (alternative to map for easy testing) */}
+      {/* Items List */}
       <View style={styles.listSection}>
-        <Text style={styles.listTitle}>📋 Found Items List</Text>
+        <View style={styles.listHeader}>
+          <Text style={styles.listTitle}>All Items</Text>
+          <View style={styles.quickActions}>
+            <TouchableOpacity
+              style={styles.quickActionButton}
+              onPress={() => navigation.navigate('ReportLost')}
+            >
+              <Text style={styles.quickActionText}>Report Lost</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionButton}
+              onPress={() => navigation.navigate('ReportFound')}
+            >
+              <Text style={styles.quickActionText}>Report Found</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <FlatList
           data={filteredItems}
           keyExtractor={(item) => item.id}
@@ -345,12 +361,12 @@ export default function MapScreen({ navigation }) {
                     item.itemType === 'lost' ? styles.lostBadge : styles.foundBadge
                   ]}>
                     <Text style={styles.typeBadgeText}>
-                      {item.itemType === 'lost' ? '❓ Lost' : '✓ Found'}
+                      {item.itemType === 'lost' ? 'Lost' : 'Found'}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.listItemLocation}>
-                  📍 {item.location} • {formatTimeAgo(item.timestamp)}
+                  {item.location} • {formatTimeAgo(item.timestamp)}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -364,23 +380,13 @@ export default function MapScreen({ navigation }) {
               colors={['#B3A369']}
             />
           }
+          ListEmptyComponent={
+            <View style={styles.emptyList}>
+              <Text style={styles.emptyListText}>No items to display</Text>
+              <Text style={styles.emptyListSubtext}>Try changing the filter or report an item</Text>
+            </View>
+          }
         />
-      </View>
-
-      {/* Quick Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('ReportLost')}
-        >
-          <Text style={styles.actionButtonText}>📢 Report Lost</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('ReportFound')}
-        >
-          <Text style={styles.actionButtonText}>🎯 Report Found</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Item Detail Modal */}
@@ -434,14 +440,14 @@ export default function MapScreen({ navigation }) {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Location:</Text>
                     <Text style={styles.detailValue}>
-                      📍 {selectedItem.location}
+                      {selectedItem.location}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Reported:</Text>
                     <Text style={styles.detailValue}>
-                      🕐 {formatTimeAgo(selectedItem.timestamp)}
+                      {formatTimeAgo(selectedItem.timestamp)}
                     </Text>
                   </View>
                 </View>
@@ -545,7 +551,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mapContainer: {
-    height: 300,
+    height: 250,
     backgroundColor: '#e8f4f8',
     position: 'relative',
     borderBottomWidth: 1,
@@ -700,12 +706,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
   listTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#003057',
-    padding: 16,
-    paddingBottom: 8,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickActionButton: {
+    backgroundColor: '#B3A369',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  quickActionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyList: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyListText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  emptyListSubtext: {
+    fontSize: 13,
+    color: '#999',
   },
   list: {
     flex: 1,
@@ -757,30 +799,6 @@ const styles = StyleSheet.create({
   listItemLocation: {
     fontSize: 13,
     color: '#666',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-  },
-  actionButton: {
-    backgroundColor: '#B3A369',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
   },
   modalOverlay: {
     flex: 1,

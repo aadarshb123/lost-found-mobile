@@ -169,7 +169,7 @@ export default function ReportLostScreen({ navigation }) {
           <Text style={styles.label}>Photo (Optional)</Text>
           <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
             <Text style={styles.photoButtonText}>
-              {photo ? '✓ Photo Added' : '📷 Add Photo'}
+              {photo ? 'Photo Added' : 'Add Photo'}
             </Text>
           </TouchableOpacity>
           {photo && (

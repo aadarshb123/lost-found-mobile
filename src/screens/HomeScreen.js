@@ -14,7 +14,6 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.content}>
         {/* Logo/Branding */}
         <View style={styles.header}>
-          <Text style={styles.logo}>🔍</Text>
           <Text style={styles.title}>Lost & Found</Text>
           <Text style={styles.subtitle}>Georgia Tech Lost & Found</Text>
         </View>
@@ -37,7 +36,6 @@ export default function HomeScreen({ navigation }) {
             style={styles.actionButton}
             onPress={() => navigation.navigate('ReportLost')}
           >
-            <Text style={styles.actionIcon}>📢</Text>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionTitle}>Report Lost Item</Text>
               <Text style={styles.actionSubtitle}>
@@ -50,7 +48,6 @@ export default function HomeScreen({ navigation }) {
             style={styles.actionButton}
             onPress={() => navigation.navigate('ReportFound')}
           >
-            <Text style={styles.actionIcon}>🎯</Text>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionTitle}>Report Found Item</Text>
               <Text style={styles.actionSubtitle}>
@@ -63,7 +60,6 @@ export default function HomeScreen({ navigation }) {
             style={styles.actionButton}
             onPress={() => navigation.navigate('Map')}
           >
-            <Text style={styles.actionIcon}>🗺️</Text>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionTitle}>Browse Map</Text>
               <Text style={styles.actionSubtitle}>
