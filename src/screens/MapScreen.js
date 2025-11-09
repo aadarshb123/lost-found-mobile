@@ -517,17 +517,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+    maxHeight: 60,
   },
   filterContent: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     backgroundColor: '#f0f0f0',
     marginRight: 8,
+    height: 32,
+    justifyContent: 'center',
   },
   filterButtonActive: {
     backgroundColor: '#003057',
@@ -537,13 +541,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     marginRight: 6,
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
   },
   filterTextActive: {
