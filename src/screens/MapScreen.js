@@ -21,9 +21,9 @@ import ApiService from '../services/api';
 // Helper to get correct API URL for platform
 const getApiUrl = () => {
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:8000/api';
+    return 'http://192.168.1.176:8000/api';
   }
-  return 'http://localhost:8000/api';
+  return 'http://192.168.1.176:8000/api';
 };
 
 // Georgia Tech campus center coordinates
