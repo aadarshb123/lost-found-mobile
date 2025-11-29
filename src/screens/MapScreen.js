@@ -17,6 +17,7 @@ import { WebView } from 'react-native-webview';
 import { useFocusEffect } from '@react-navigation/native';
 import { categories } from '../data/mockItems';
 import ApiService from '../services/api';
+import BannerAd from '../components/BannerAd';
 
 // Helper to get correct API URL for platform
 const getApiUrl = () => {
@@ -473,6 +474,7 @@ export default function MapScreen({ navigation }) {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      <BannerAd position="bottom" />
     </SafeAreaView>
   );
 }

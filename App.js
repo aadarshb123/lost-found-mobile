@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
+
+// Try to import AdMob, but handle gracefully if not available (e.g., in Expo Go)
+let mobileAds;
+try {
+  mobileAds = require('react-native-google-mobile-ads').default;
+} catch (error) {
+  console.warn('AdMob module not available. Make sure you are using a development build, not Expo Go.');
+  mobileAds = null;
+}
 
 // Import screens
 import HomeScreen from './src/screens/HomeScreen';
@@ -14,6 +23,20 @@ import ReportFoundScreen from './src/screens/ReportFoundScreen';
 const Stack = createStackNavigator();
 
 export default function App() {
+  useEffect(() => {
+    // Initialize AdMob SDK if available
+    if (mobileAds) {
+      mobileAds()
+        .initialize()
+        .then(adapterStatuses => {
+          console.log('AdMob initialized', adapterStatuses);
+        })
+        .catch(error => {
+          console.error('AdMob initialization error:', error);
+        });
+    }
+  }, []);
+
   return (
     <NavigationContainer>
       <StatusBar style="light" />

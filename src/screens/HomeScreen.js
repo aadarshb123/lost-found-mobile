@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
+import BannerAd from '../components/BannerAd';
 
 export default function HomeScreen({ navigation }) {
   return (
@@ -87,6 +88,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </View>
+      <BannerAd position="bottom" />
     </SafeAreaView>
   );
 }
