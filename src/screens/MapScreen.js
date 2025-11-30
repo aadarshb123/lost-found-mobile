@@ -22,9 +22,9 @@ import ApiService from '../services/api';
 // Helper to get correct API URL for platform
 const getApiUrl = () => {
   if (Platform.OS === 'android') {
-    return 'http://192.168.1.30:8000/api';
+    return 'https://lost-and-found-backend-swart.vercel.app/api';
   }
-  return 'http://192.168.1.30:8000/api';
+  return 'https://lost-and-found-backend-swart.vercel.app/api';
 };
 
 // Georgia Tech campus center coordinates

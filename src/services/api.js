@@ -4,14 +4,14 @@ import { Platform } from 'react-native';
 const getDevApiUrl = () => {
   // iOS Simulator can use localhost
   if (Platform.OS === 'ios') {
-    return 'http://192.168.1.30:8000/api';
+    return 'https://lost-and-found-backend-swart.vercel.app/api';
   }
   // Android Emulator needs 10.0.2.2 instead of localhost
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8000/api';
   }
   // Fallback
-  return 'http://192.168.1.30:8000/api';
+  return 'https://lost-and-found-backend-swart.vercel.app/api';
 };
 
 const API_BASE_URL = __DEV__
