@@ -212,7 +212,7 @@ export default function ReportFoundScreen({ navigation }) {
             text: 'Done',
             onPress: () => {
               resetForm();
-              navigation.navigate('Home');
+              navigation.navigate('Map');
             },
           },
         ]

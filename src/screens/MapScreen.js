@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,9 +23,9 @@ import BannerAd from '../components/BannerAd';
 // Helper to get correct API URL for platform
 const getApiUrl = () => {
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:8000/api';
+    return 'https://lost-and-found-backend-swart.vercel.app/api';
   }
-  return 'http://localhost:8000/api';
+  return 'https://lost-and-found-backend-swart.vercel.app/api';
 };
 
 // Georgia Tech campus center coordinates
@@ -187,6 +188,72 @@ export default function MapScreen({ navigation }) {
   const onRefresh = () => {
     setRefreshing(true);
     fetchAllItems();
+  };
+
+  // Handle claim item
+  const handleClaimItem = async () => {
+    if (!selectedItem) return;
+
+    // Only allow claiming FOUND items
+    if (selectedItem.itemType !== 'found') {
+      Alert.alert(
+        'Cannot Claim',
+        'You can only claim items that have been found. This is a lost item listing.'
+      );
+      return;
+    }
+
+    // Prompt for user email
+    Alert.prompt(
+      'Claim This Item',
+      'Please enter your email to receive a confirmation link',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Submit Claim',
+          onPress: async (email) => {
+            if (!email || !email.includes('@')) {
+              Alert.alert('Invalid Email', 'Please enter a valid email address');
+              return;
+            }
+
+            try {
+              const apiUrl = getApiUrl();
+              const response = await fetch(`${apiUrl}/reconciliation/claim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  foundItemId: selectedItem.id,
+                  claimantEmail: email.trim().toLowerCase(),
+                  claimantName: 'User',
+                  claimantUserId: 'u12345'
+                })
+              });
+
+              const data = await response.json();
+
+              if (response.ok) {
+                Alert.alert(
+                  'Claim Submitted!',
+                  `Check your email for a confirmation link. Both you and the finder must confirm.\n\nExpires: ${new Date(data.expiresAt).toLocaleDateString()}`
+                );
+                setSelectedItem(null);
+                // Refresh items to reflect reconciliation status
+                fetchAllItems();
+              } else {
+                throw new Error(data.detail || 'Failed to submit claim');
+              }
+            } catch (error) {
+              console.error('Claim error:', error);
+              Alert.alert('Error', 'Failed to submit claim. Please try again later.');
+            }
+          }
+        }
+      ],
+      'plain-text',
+      '',
+      'email-address'
+    );
   };
 
   const filteredItems =
@@ -456,12 +523,7 @@ export default function MapScreen({ navigation }) {
                 <View style={styles.modalFooter}>
                   <TouchableOpacity
                     style={styles.claimButton}
-                    onPress={() => {
-                      setSelectedItem(null);
-                      alert(
-                        'In the full app, this would let you contact the finder or front desk to claim the item.'
-                      );
-                    }}
+                    onPress={handleClaimItem}
                   >
                     <Text style={styles.claimButtonText}>This is Mine!</Text>
                   </TouchableOpacity>
