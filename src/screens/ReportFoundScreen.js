@@ -333,7 +333,7 @@ export default function ReportFoundScreen({ navigation }) {
         </View>
 
         {/* DEMO: Test Notification Button */}
-        <View style={styles.demoSection}>
+        {/* <View style={styles.demoSection}>
           <Text style={styles.demoTitle}>🧪 Demo Notification System</Text>
           <Text style={styles.demoText}>
             Test how users will be notified when items match! This sends both an email and in-app notification.
@@ -349,7 +349,7 @@ export default function ReportFoundScreen({ navigation }) {
               <Text style={styles.demoButtonText}>📬 Send Demo Notification</Text>
             )}
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         <TouchableOpacity
           style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
