@@ -10,15 +10,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { useUser } from '../context/UserContext';
 
 export default function CreateAccountScreen({ navigation }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { register } = useUser();
 
-  const handleCreateAccount = () => {
+  const handleCreateAccount = async () => {
     // Validation
     if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -40,23 +44,24 @@ export default function CreateAccountScreen({ navigation }) {
       return;
     }
 
-    // In real app, this would create account in Firebase/backend
-    Alert.alert(
-      'Account Created!',
-      `Welcome to GT Lost & Found, ${fullName.split(' ')[0]}! You can now sign in.`,
-      [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('Login'),
-        },
-      ]
-    );
-
-    // Clear form
-    setFullName('');
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
+    setIsLoading(true);
+    try {
+      await register(email.trim(), password, fullName.trim());
+      Alert.alert(
+        'Account Created!',
+        `Welcome to GT Lost & Found, ${fullName.split(' ')[0]}!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Map'),
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Registration Failed', error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -86,6 +91,7 @@ export default function CreateAccountScreen({ navigation }) {
                 value={fullName}
                 onChangeText={setFullName}
                 autoCapitalize="words"
+                editable={!isLoading}
               />
 
               <Text style={styles.label}>Email *</Text>
@@ -97,6 +103,7 @@ export default function CreateAccountScreen({ navigation }) {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoCorrect={false}
+                editable={!isLoading}
               />
 
               <Text style={styles.label}>Password *</Text>
@@ -107,6 +114,7 @@ export default function CreateAccountScreen({ navigation }) {
                 onChangeText={setPassword}
                 secureTextEntry
                 autoCapitalize="none"
+                editable={!isLoading}
               />
 
               <Text style={styles.label}>Confirm Password *</Text>
@@ -117,25 +125,34 @@ export default function CreateAccountScreen({ navigation }) {
                 onChangeText={setConfirmPassword}
                 secureTextEntry
                 autoCapitalize="none"
+                editable={!isLoading}
               />
 
               <Text style={styles.note}>
-                💡 You'll receive email notifications when items matching your
+                You'll receive email notifications when items matching your
                 lost item reports are found
               </Text>
 
               <TouchableOpacity
-                style={styles.createButton}
+                style={[styles.createButton, isLoading && styles.createButtonDisabled]}
                 onPress={handleCreateAccount}
+                disabled={isLoading}
               >
-                <Text style={styles.createButtonText}>Create Account</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.createButtonText}>Create Account</Text>
+                )}
               </TouchableOpacity>
             </View>
 
             {/* Sign In Link */}
             <View style={styles.signinSection}>
               <Text style={styles.signinText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Login')}
+                disabled={isLoading}
+              >
                 <Text style={styles.signinLink}>Sign In</Text>
               </TouchableOpacity>
             </View>
@@ -222,6 +239,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  createButtonDisabled: {
+    opacity: 0.6,
   },
   createButtonText: {
     color: '#fff',
