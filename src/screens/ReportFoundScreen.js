@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import * as Notifications from 'expo-notifications';
 import { categories, gtBuildings } from '../data/mockItems';
 import ApiService from '../services/api';
 import { sendFoundItemConfirmation, sendMatchNotification } from '../services/emailService';
+import { useUser } from '../context/UserContext';
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -27,6 +28,7 @@ Notifications.setNotificationHandler({
 });
 
 export default function ReportFoundScreen({ navigation }) {
+  const { user } = useUser();
   const [itemName, setItemName] = useState('');
   const [category, setCategory] = useState(categories[0]);
   const [description, setDescription] = useState('');
@@ -35,6 +37,14 @@ export default function ReportFoundScreen({ navigation }) {
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pre-fill user info if logged in
+  useEffect(() => {
+    if (user) {
+      setUserEmail(user.email || '');
+      setUserName(user.fullName || '');
+    }
+  }, [user]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({

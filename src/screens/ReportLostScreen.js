@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { categories, gtBuildings } from '../data/mockItems';
 import ApiService from '../services/api';
 import { sendLostItemConfirmation } from '../services/emailService';
+import { useUser } from '../context/UserContext';
 
 export default function ReportLostScreen({ navigation }) {
+  const { user } = useUser();
   const [itemName, setItemName] = useState('');
   const [category, setCategory] = useState(categories[0]);
   const [description, setDescription] = useState('');
@@ -25,6 +27,14 @@ export default function ReportLostScreen({ navigation }) {
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pre-fill user info if logged in
+  useEffect(() => {
+    if (user) {
+      setUserEmail(user.email || '');
+      setUserName(user.fullName || '');
+    }
+  }, [user]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({

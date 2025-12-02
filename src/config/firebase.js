@@ -6,15 +6,15 @@ import {
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Your web app's Firebase configuration
+// Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyDi75pwmfSJtgOhG5Fes9mhvfL7_xnV28M",
-  authDomain: "lost-and-found-e7634.firebaseapp.com",
-  projectId: "lost-and-found-e7634",
-  storageBucket: "lost-and-found-e7634.firebasestorage.app",
-  messagingSenderId: "1047684379967",
-  appId: "1:1047684379967:web:5cc2482526b3e907db4f8a",
-  measurementId: "G-FJ0K8F0H4V"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase (prevent re-initialization)
