@@ -8,7 +8,7 @@ const getDevApiUrl = () => {
   }
   // Android Emulator needs 10.0.2.2 instead of localhost
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:8000/api';
+    return 'https://lost-and-found-backend-swart.vercel.app/api';
   }
   // Fallback
   return 'https://lost-and-found-backend-swart.vercel.app/api';

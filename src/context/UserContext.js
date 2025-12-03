@@ -80,6 +80,13 @@ export function UserProvider({ children }) {
         displayName: fullName
       });
 
+      setUser({
+        userId: userCredential.user.uid,
+        email: userCredential.user.email,
+        fullName: fullName,
+        emailVerified: userCredential.user.emailVerified,
+      });
+
       return {
         success: true,
         user: userCredential.user
